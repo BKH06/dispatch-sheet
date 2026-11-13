@@ -93,6 +93,8 @@
   body:not(.master-mode) #bulkEntryPanel{ display:none; }
   body:not(.master-mode):not(.admin-mode) #cleanFormPanel{ display:none; }
   body:not(.master-mode):not(.admin-mode) #cleanAddBtn{ display:none; }
+  body:not(.master-mode):not(.admin-mode) .clean-plus{ display:none; }
+  .clean-tab.active{ background:var(--panel-2); border-color:var(--text); font-weight:700; }
   body:not(.master-mode) .grid{ grid-template-columns: 1fr; }
   body:not(.master-mode) .btn-danger{ display:none; }
   body:not(.master-mode) #reportPanel{ display:none; }
@@ -458,8 +460,7 @@
         <h2>분리 / 세척 수량 입력</h2>
         <label>날짜</label>
         <input type="date" id="cleanDate">
-        <label>제품코드</label>
-        <input type="text" id="cleanCode" list="codeList" placeholder="예: 3300" autocomplete="off">
+        <input type="hidden" id="cleanCode">
         <label>제품명</label>
         <input type="text" id="cleanProductName" list="nameList" placeholder="예: 4315(검정)" autocomplete="off">
         <div class="product-name" id="cleanNameHint"></div>
@@ -469,21 +470,36 @@
           <div style="border:1px solid var(--amber); border-radius:10px; padding:10px 12px;">
             <div style="color:var(--amber); font-weight:700; font-size:13px;">분리팀</div>
             <label>수량 (개)</label><input type="number" id="cleanSepQty" placeholder="낱개 수량" min="0">
-            <label>파렛트 (P)</label><input type="number" id="cleanSepPlt" placeholder="파렛트 수" min="0" step="any">
+            <label>파렛트 (P) <span style="color:var(--text-dim); font-weight:400;">· 버튼으로 1개씩</span></label>
+            <div style="display:flex; gap:6px; align-items:center;">
+              <button type="button" class="btn-ghost" id="cleanSepMinus" style="width:auto; padding:10px 14px; margin-top:0;">−1</button>
+              <input type="number" id="cleanSepPlt" readonly value="0" style="text-align:center; font-weight:700; margin-top:0;">
+              <button type="button" class="btn-primary" id="cleanSepPlus" style="width:auto; padding:10px 14px; margin-top:0; white-space:nowrap;">＋1 파렛트</button>
+            </div>
           </div>
           <div style="border:1px solid var(--teal); border-radius:10px; padding:10px 12px;">
             <div style="color:var(--teal); font-weight:700; font-size:13px;">세척팀</div>
             <label>수량 (개)</label><input type="number" id="cleanWashQty" placeholder="낱개 수량" min="0">
-            <label>파렛트 (P)</label><input type="number" id="cleanWashPlt" placeholder="파렛트 수" min="0" step="any">
+            <label>파렛트 (P) <span style="color:var(--text-dim); font-weight:400;">· 버튼으로 1개씩</span></label>
+            <div style="display:flex; gap:6px; align-items:center;">
+              <button type="button" class="btn-ghost" id="cleanWashMinus" style="width:auto; padding:10px 14px; margin-top:0;">−1</button>
+              <input type="number" id="cleanWashPlt" readonly value="0" style="text-align:center; font-weight:700; margin-top:0;">
+              <button type="button" class="btn-primary" id="cleanWashPlus" style="width:auto; padding:10px 14px; margin-top:0; white-space:nowrap;">＋1 파렛트</button>
+            </div>
           </div>
         </div>
-        <div class="hint" style="margin-top:6px;">파렛트를 입력하면 수량이 자동 계산돼요 (파렛트 × 파렛트당 수량). 수량만 직접 입력해도 됩니다. 같은 제품을 다시 입력하면 더해집니다.</div>
+        <div class="hint" style="margin-top:6px;">＋1 파렛트 버튼을 누를 때마다 파렛트가 1씩 늘고 수량이 자동 계산돼요 (파렛트 × 파렛트당 수량). 수량만 직접 입력해도 됩니다. 같은 제품을 다시 입력하면 더해집니다.</div>
         <label>비고 <span style="color:var(--text-dim); font-weight:400;">(선택)</span></label>
         <input type="text" id="cleanNote" placeholder="메모">
         <button class="btn-primary" id="cleanSubmitBtn">등록</button>
       </div>
       <div class="panel">
         <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;"><h2 style="margin:0;">분리 / 세척 현황</h2><button class="btn-primary" id="cleanAddBtn" style="width:auto; margin-top:0; margin-left:auto; padding:8px 16px;">＋ 수량 입력</button></div>
+        <div style="display:flex; gap:8px; margin-bottom:12px;" id="cleanTabs">
+          <button class="btn-ghost clean-tab active" data-tab="all" style="flex:1; margin-top:0;">전체</button>
+          <button class="btn-ghost clean-tab" data-tab="sep" style="flex:1; margin-top:0; color:var(--amber);">분리팀 현황</button>
+          <button class="btn-ghost clean-tab" data-tab="wash" style="flex:1; margin-top:0; color:var(--teal);">세척팀 현황</button>
+        </div>
         <div class="filter-bar">
           <div><label>조회 날짜</label><input type="date" id="cleanViewDate"></div>
           <div><label>검색</label><input type="text" id="cleanSearchInput" placeholder="코드 또는 제품명 검색"></div>
@@ -496,7 +512,7 @@
         <div class="hint" style="margin-bottom:10px;" id="cleanSummary"></div>
         <div style="overflow-x:auto; max-height:600px; overflow-y:auto;">
           <table>
-            <thead><tr><th>코드</th><th>제품명</th><th style="color:var(--amber);">분리 수량</th><th style="color:var(--amber);">분리 P</th><th style="color:var(--teal);">세척 수량</th><th style="color:var(--teal);">세척 P</th><th>합계 수량</th><th>합계 P</th><th></th></tr></thead>
+            <thead id="cleanHead"></thead>
             <tbody id="cleanRows"><tr class="empty-row"><td colspan="9">불러오는 중...</td></tr></tbody>
           </table>
         </div>
@@ -1462,6 +1478,7 @@ initFirebase();
 
 // ===== 분리/세척 현황 (팀별 수량 + 파렛트, 날짜별) =====
 let allCleaningLogs = [];
+let cleanTab = 'all';
 let palletMap = {}; // 제품명 -> 파렛트당 수량
 // team: 'sep' = 분리팀, 그 외(과거 기록 포함) = 세척팀. qty = 낱개 수량, pallets = 파렛트 수
 function teamOf(l){ return l.team === 'sep' ? 'sep' : 'wash'; }
@@ -1504,8 +1521,18 @@ document.getElementById('cleanProductName').addEventListener('input', (e)=>{
 
 document.getElementById('cleanProductName').addEventListener('change', fillPerPallet);
 document.getElementById('cleanPerPallet').addEventListener('input', ()=>{ recalcQty('Sep'); recalcQty('Wash'); });
-document.getElementById('cleanSepPlt').addEventListener('input', ()=> recalcQty('Sep'));
-document.getElementById('cleanWashPlt').addEventListener('input', ()=> recalcQty('Wash'));
+['Sep','Wash'].forEach(T=>{
+  const stepPlt = (d)=>{
+    const el = document.getElementById('clean'+T+'Plt');
+    const next = Math.max(0, (Number(el.value)||0) + d);
+    el.value = next;
+    const pp = Number(document.getElementById('cleanPerPallet').value)||0;
+    if(pp) document.getElementById('clean'+T+'Qty').value = next ? Math.round(next*pp*100)/100 : '';
+    else if(d>0) toast('먼저 파렛트당 수량을 입력해주세요.', true);
+  };
+  document.getElementById('clean'+T+'Plus').addEventListener('click', ()=> stepPlt(1));
+  document.getElementById('clean'+T+'Minus').addEventListener('click', ()=> stepPlt(-1));
+});
 
 document.getElementById('cleanSubmitBtn').addEventListener('click', async ()=>{
   if(!db){ toast('먼저 Firebase 설정을 완료해주세요.', true); return; }
@@ -1516,7 +1543,7 @@ document.getElementById('cleanSubmitBtn').addEventListener('click', async ()=>{
   const v = id => Number(document.getElementById(id).value)||0;
   const sepQty = v('cleanSepQty'), sepPlt = v('cleanSepPlt'), washQty = v('cleanWashQty'), washPlt = v('cleanWashPlt');
   const note = document.getElementById('cleanNote').value.trim();
-  if(!code && !name){ toast('제품코드 또는 제품명을 입력해주세요.', true); return; }
+  if(!code && !name){ toast('제품명을 입력해주세요.', true); return; }
   if(code && !name) name = productsMap[code] || '';
   if(name && !code) code = productsByName[name] || '';
   if(!sepQty && !sepPlt && !washQty && !washPlt){ toast('수량 또는 파렛트를 입력해주세요.', true); return; }
@@ -1533,6 +1560,7 @@ document.getElementById('cleanSubmitBtn').addEventListener('click', async ()=>{
     await batch.commit();
     toast('등록 완료');
     ['cleanCode','cleanProductName','cleanPerPallet','cleanSepQty','cleanSepPlt','cleanWashQty','cleanWashPlt','cleanNote'].forEach(id=> document.getElementById(id).value = '');
+    document.getElementById('cleanSepPlt').value = 0; document.getElementById('cleanWashPlt').value = 0;
     document.getElementById('cleanNameHint').textContent = '';
     document.getElementById('cleanViewDate').value = date;
     renderCleaning();
@@ -1569,26 +1597,63 @@ function renderCleaning(){
   document.getElementById('cleanSumSep').textContent = fmtN(T.sepQ)+'개 / '+fmtN(T.sepP)+'P';
   document.getElementById('cleanSumWash').textContent = fmtN(T.washQ)+'개 / '+fmtN(T.washP)+'P';
   document.getElementById('cleanSumAll').textContent = fmtN(T.sepQ+T.washQ)+'개 / '+fmtN(T.sepP+T.washP)+'P';
+  const head = document.getElementById('cleanHead');
+  const A = 'style="color:var(--amber);"', W = 'style="color:var(--teal);"';
+  head.innerHTML = '<tr><th>코드</th><th>제품명</th>' +
+    (cleanTab!=='wash' ? '<th '+A+'>분리 수량</th><th '+A+'>분리 P</th>' : '') +
+    (cleanTab!=='sep' ? '<th '+W+'>세척 수량</th><th '+W+'>세척 P</th>' : '') +
+    (cleanTab==='all' ? '<th>합계 수량</th><th>합계 P</th>' : '') + '<th></th></tr>';
+  document.querySelectorAll('.clean-tab').forEach(b=> b.classList.toggle('active', b.dataset.tab===cleanTab));
+  const colN = cleanTab==='all' ? 9 : 5;
   const rows = Object.values(byProduct)
+    .filter(r=> cleanTab==='all' || (cleanTab==='sep' ? (r.sepQ||r.sepP) : (r.washQ||r.washP)))
     .filter(r=> !q || String(r.code).toLowerCase().includes(q) || String(r.name).toLowerCase().includes(q))
     .sort((a,b)=> String(a.name).localeCompare(String(b.name), 'ko', {numeric:true}));
-  document.getElementById('cleanSummary').textContent = date + ' · ' + rows.length + '개 제품 (숫자를 누르면 수정 · 파렛트를 고치면 수량도 자동 계산)';
+  document.getElementById('cleanSummary').textContent = date + ' · ' + rows.length + '개 제품 (＋1 버튼 = 1파렛트 추가 · 숫자를 누르면 직접 수정)';
   tbody.innerHTML = '';
   if(rows.length === 0){
-    tbody.innerHTML = '<tr class="empty-row"><td colspan="9">해당 날짜의 분리/세척 내역이 없습니다.</td></tr>';
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="'+colN+'">해당 날짜의 '+(cleanTab==='sep'?'분리':cleanTab==='wash'?'세척':'분리/세척')+' 내역이 없습니다.</td></tr>';
     return;
   }
   const cell = (r, team, field, v, color)=>
-    '<td class="clean-qty" data-name="'+r.name+'" data-code="'+r.code+'" data-team="'+team+'" data-field="'+field+'" data-v="'+v+'" style="cursor:pointer; font-family:var(--font-mono); font-weight:700; color:'+(v?color:'var(--text-dim)')+';" title="클릭하여 수정">'+fmtN(v)+'</td>';
+    '<td class="clean-qty" data-name="'+r.name+'" data-code="'+r.code+'" data-team="'+team+'" data-field="'+field+'" data-v="'+v+'" style="cursor:pointer; font-family:var(--font-mono); font-weight:700; color:'+(v?color:'var(--text-dim)')+';" title="숫자를 누르면 직접 수정">'+fmtN(v)+(field==='pallets' ? ' <button class="clean-plus" data-name="'+r.name+'" data-code="'+r.code+'" data-team="'+team+'" style="margin-left:6px; padding:3px 9px; border-radius:6px; border:1px solid '+color+'; background:transparent; color:'+color+'; font-weight:700; cursor:pointer;">＋1</button>' : '')+'</td>';
   rows.forEach(r=>{
     const tr = document.createElement('tr');
     tr.innerHTML = '<td>'+r.code+'</td><td>'+r.name+'</td>'+
-      cell(r,'sep','qty',r.sepQ,'var(--amber)')+cell(r,'sep','pallets',r.sepP,'var(--amber)')+
-      cell(r,'wash','qty',r.washQ,'var(--teal)')+cell(r,'wash','pallets',r.washP,'var(--teal)')+
-      '<td style="font-family:var(--font-mono); font-weight:700;">'+fmtN(r.sepQ+r.washQ)+'</td>'+
-      '<td style="font-family:var(--font-mono); font-weight:700;">'+fmtN(r.sepP+r.washP)+'</td>'+
-      '<td><button class="btn-danger" data-name="'+r.name+'">삭제</button></td>';
+      (cleanTab!=='wash' ? cell(r,'sep','qty',r.sepQ,'var(--amber)')+cell(r,'sep','pallets',r.sepP,'var(--amber)') : '')+
+      (cleanTab!=='sep' ? cell(r,'wash','qty',r.washQ,'var(--teal)')+cell(r,'wash','pallets',r.washP,'var(--teal)') : '')+
+      (cleanTab==='all' ? '<td style="font-family:var(--font-mono); font-weight:700;">'+fmtN(r.sepQ+r.washQ)+'</td>'+
+      '<td style="font-family:var(--font-mono); font-weight:700;">'+fmtN(r.sepP+r.washP)+'</td>' : '')+
+      '<td><button class="btn-danger" data-name="'+r.name+'" data-team="'+(cleanTab==='all'?'':cleanTab)+'">삭제</button></td>';
     tbody.appendChild(tr);
+  });
+  tbody.querySelectorAll('.clean-plus').forEach(btn=>{
+    btn.addEventListener('click', async (ev)=>{
+      ev.stopPropagation();
+      if(!canEditClean()){ toast('관리자 로그인 후 입력할 수 있습니다.', true); return; }
+      const team = btn.dataset.team, name = btn.dataset.name;
+      let pp = perPalletOf(name);
+      if(!pp){
+        const ppIn = prompt('이 제품의 파렛트당 수량(개)을 입력하세요 ('+name+')');
+        pp = Number(ppIn)||0;
+        if(!pp) return;
+      }
+      try{
+        if(perPalletOf(name) !== pp) await db.collection('config').doc('palletQty').set({ [name]: pp }, { merge: true });
+        const mine = allCleaningLogs.filter(l=> l.date===date && (l.productName||l.productCode||'-')===name && teamOf(l)===team);
+        if(mine.length){
+          await db.collection('cleaningLogs').doc(mine[0].id).update({
+            pallets: firebase.firestore.FieldValue.increment(1),
+            qty: firebase.firestore.FieldValue.increment(pp)
+          });
+        }else{
+          await db.collection('cleaningLogs').add({
+            date, productCode: btn.dataset.code==='-'?'':btn.dataset.code, productName: name==='-'?'':name,
+            qty: pp, pallets: 1, team, note: '', createdAt: firebase.firestore.FieldValue.serverTimestamp()
+          });
+        }
+      }catch(e){ toast('추가 실패: ' + e.message, true); }
+    });
   });
   tbody.querySelectorAll('.clean-qty').forEach(td=>{
     td.addEventListener('click', async ()=>{
@@ -1626,10 +1691,11 @@ function renderCleaning(){
   tbody.querySelectorAll('.btn-danger').forEach(btn=>{
     btn.addEventListener('click', async ()=>{
       if(!document.body.classList.contains('master-mode')){ toast('마스터관리자만 삭제할 수 있습니다.', true); return; }
-      if(!confirm(btn.dataset.name+' 의 이 날짜 분리/세척 내역을 모두 삭제할까요?')) return;
+      const dTeam = btn.dataset.team;
+      if(!confirm(btn.dataset.name+' 의 이 날짜 '+(dTeam==='sep'?'분리팀':dTeam==='wash'?'세척팀':'분리/세척')+' 내역을 모두 삭제할까요?')) return;
       try{
         const batch = db.batch();
-        allCleaningLogs.filter(l=> l.date===date && (l.productName||l.productCode||'-')===btn.dataset.name)
+        allCleaningLogs.filter(l=> l.date===date && (l.productName||l.productCode||'-')===btn.dataset.name && (!dTeam || teamOf(l)===dTeam))
           .forEach(l=> batch.delete(db.collection('cleaningLogs').doc(l.id)));
         await batch.commit();
         toast('삭제 완료');
@@ -1640,8 +1706,9 @@ function renderCleaning(){
 document.getElementById('cleanAddBtn').addEventListener('click', ()=>{
   document.getElementById('cleanDate').value = document.getElementById('cleanViewDate').value || todayStr();
   document.getElementById('cleanFormPanel').scrollIntoView({behavior:'smooth', block:'center'});
-  document.getElementById('cleanCode').focus();
+  document.getElementById('cleanProductName').focus();
 });
+document.querySelectorAll('.clean-tab').forEach(b=> b.addEventListener('click', ()=>{ cleanTab = b.dataset.tab; renderCleaning(); }));
 document.getElementById('cleanViewDate').addEventListener('change', renderCleaning);
 document.getElementById('cleanSearchInput').addEventListener('input', renderCleaning);
 
