@@ -463,11 +463,21 @@
         <label>제품명</label>
         <input type="text" id="cleanProductName" list="nameList" placeholder="예: 4315(검정)" autocomplete="off">
         <div class="product-name" id="cleanNameHint"></div>
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
-          <div><label style="color:var(--amber);">분리팀 · 분리수량</label><input type="number" id="cleanSepQty" placeholder="분리수량" min="0"></div>
-          <div><label style="color:var(--teal);">세척팀 · 세척수량</label><input type="number" id="cleanWashQty" placeholder="세척수량" min="0"></div>
+        <label>파렛트당 수량 (개/P) <span style="color:var(--text-dim); font-weight:400;">· 제품별로 한 번만 입력하면 저장돼요</span></label>
+        <input type="number" id="cleanPerPallet" placeholder="예: 200" min="0">
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:12px;">
+          <div style="border:1px solid var(--amber); border-radius:10px; padding:10px 12px;">
+            <div style="color:var(--amber); font-weight:700; font-size:13px;">분리팀</div>
+            <label>수량 (개)</label><input type="number" id="cleanSepQty" placeholder="낱개 수량" min="0">
+            <label>파렛트 (P)</label><input type="number" id="cleanSepPlt" placeholder="파렛트 수" min="0" step="any">
+          </div>
+          <div style="border:1px solid var(--teal); border-radius:10px; padding:10px 12px;">
+            <div style="color:var(--teal); font-weight:700; font-size:13px;">세척팀</div>
+            <label>수량 (개)</label><input type="number" id="cleanWashQty" placeholder="낱개 수량" min="0">
+            <label>파렛트 (P)</label><input type="number" id="cleanWashPlt" placeholder="파렛트 수" min="0" step="any">
+          </div>
         </div>
-        <div class="hint" style="margin-top:6px;">해당 팀 수량만 입력해도 됩니다. 같은 제품을 다시 입력하면 수량이 더해져요.</div>
+        <div class="hint" style="margin-top:6px;">파렛트를 입력하면 수량이 자동 계산돼요 (파렛트 × 파렛트당 수량). 수량만 직접 입력해도 됩니다. 같은 제품을 다시 입력하면 더해집니다.</div>
         <label>비고 <span style="color:var(--text-dim); font-weight:400;">(선택)</span></label>
         <input type="text" id="cleanNote" placeholder="메모">
         <button class="btn-primary" id="cleanSubmitBtn">등록</button>
@@ -479,15 +489,15 @@
           <div><label>검색</label><input type="text" id="cleanSearchInput" placeholder="코드 또는 제품명 검색"></div>
         </div>
         <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:14px;">
-          <div style="background:var(--panel-2); border:1px solid var(--amber); border-radius:10px; padding:10px 12px;"><div style="font-size:12px; color:var(--text-dim);">분리팀 합계</div><div id="cleanSumSep" style="font-family:var(--font-mono); font-size:22px; font-weight:700; color:var(--amber);">0</div></div>
-          <div style="background:var(--panel-2); border:1px solid var(--teal); border-radius:10px; padding:10px 12px;"><div style="font-size:12px; color:var(--text-dim);">세척팀 합계</div><div id="cleanSumWash" style="font-family:var(--font-mono); font-size:22px; font-weight:700; color:var(--teal);">0</div></div>
-          <div style="background:var(--panel-2); border:1px solid var(--line); border-radius:10px; padding:10px 12px;"><div style="font-size:12px; color:var(--text-dim);">전체 합계</div><div id="cleanSumAll" style="font-family:var(--font-mono); font-size:22px; font-weight:700;">0</div></div>
+          <div style="background:var(--panel-2); border:1px solid var(--amber); border-radius:10px; padding:10px 12px;"><div style="font-size:12px; color:var(--text-dim);">분리팀 합계</div><div id="cleanSumSep" style="font-family:var(--font-mono); font-size:16px; font-weight:700; color:var(--amber);">0</div></div>
+          <div style="background:var(--panel-2); border:1px solid var(--teal); border-radius:10px; padding:10px 12px;"><div style="font-size:12px; color:var(--text-dim);">세척팀 합계</div><div id="cleanSumWash" style="font-family:var(--font-mono); font-size:16px; font-weight:700; color:var(--teal);">0</div></div>
+          <div style="background:var(--panel-2); border:1px solid var(--line); border-radius:10px; padding:10px 12px;"><div style="font-size:12px; color:var(--text-dim);">전체 합계</div><div id="cleanSumAll" style="font-family:var(--font-mono); font-size:16px; font-weight:700;">0</div></div>
         </div>
         <div class="hint" style="margin-bottom:10px;" id="cleanSummary"></div>
         <div style="overflow-x:auto; max-height:600px; overflow-y:auto;">
           <table>
-            <thead><tr><th>코드</th><th>제품명</th><th style="color:var(--amber);">분리팀(분리)</th><th style="color:var(--teal);">세척팀(세척)</th><th>합계</th><th></th></tr></thead>
-            <tbody id="cleanRows"><tr class="empty-row"><td colspan="6">불러오는 중...</td></tr></tbody>
+            <thead><tr><th>코드</th><th>제품명</th><th style="color:var(--amber);">분리 수량</th><th style="color:var(--amber);">분리 P</th><th style="color:var(--teal);">세척 수량</th><th style="color:var(--teal);">세척 P</th><th>합계 수량</th><th>합계 P</th><th></th></tr></thead>
+            <tbody id="cleanRows"><tr class="empty-row"><td colspan="9">불러오는 중...</td></tr></tbody>
           </table>
         </div>
       </div>
@@ -1450,17 +1460,33 @@ document.getElementById('viewDate').value = todayStr();
 PRODUCTS_SEED.forEach(p=>{ productsMap[p.code] = p.name; if(p.name && !(p.name in productsByName)) productsByName[p.name] = p.code; });
 initFirebase();
 
-// ===== 분리/세척 현황 (팀별 수량, 날짜별) =====
+// ===== 분리/세척 현황 (팀별 수량 + 파렛트, 날짜별) =====
 let allCleaningLogs = [];
-// team: 'sep' = 분리팀(분리수량), 그 외(과거 기록 포함) = 세척팀(세척수량)
+let palletMap = {}; // 제품명 -> 파렛트당 수량
+// team: 'sep' = 분리팀, 그 외(과거 기록 포함) = 세척팀. qty = 낱개 수량, pallets = 파렛트 수
 function teamOf(l){ return l.team === 'sep' ? 'sep' : 'wash'; }
 function canEditClean(){ return document.body.classList.contains('master-mode') || document.body.classList.contains('admin-mode'); }
+function perPalletOf(name){ return Number(palletMap[name])||0; }
+function fillPerPallet(){
+  const name = document.getElementById('cleanProductName').value.trim();
+  const pp = perPalletOf(name);
+  if(pp) document.getElementById('cleanPerPallet').value = pp;
+  else if(name) document.getElementById('cleanPerPallet').value = '';
+  recalcQty('Sep'); recalcQty('Wash');
+}
+function recalcQty(team){
+  const pp = Number(document.getElementById('cleanPerPallet').value)||0;
+  const plt = Number(document.getElementById('clean'+team+'Plt').value)||0;
+  if(pp && plt) document.getElementById('clean'+team+'Qty').value = Math.round(plt*pp*100)/100;
+}
+function fmtN(n){ return (Math.round(n*100)/100).toLocaleString(); }
 
 document.getElementById('cleanCode').addEventListener('input', (e)=>{
   const foundName = productsMap[e.target.value.trim()];
   if(foundName){
     document.getElementById('cleanProductName').value = foundName;
     document.getElementById('cleanNameHint').textContent = '→ ' + foundName;
+    fillPerPallet();
   }else{
     document.getElementById('cleanNameHint').textContent = '';
   }
@@ -1470,10 +1496,16 @@ document.getElementById('cleanProductName').addEventListener('input', (e)=>{
   if(foundCode){
     document.getElementById('cleanCode').value = foundCode;
     document.getElementById('cleanNameHint').textContent = '→ 코드 ' + foundCode;
+    fillPerPallet();
   }else{
     document.getElementById('cleanNameHint').textContent = '';
   }
 });
+
+document.getElementById('cleanProductName').addEventListener('change', fillPerPallet);
+document.getElementById('cleanPerPallet').addEventListener('input', ()=>{ recalcQty('Sep'); recalcQty('Wash'); });
+document.getElementById('cleanSepPlt').addEventListener('input', ()=> recalcQty('Sep'));
+document.getElementById('cleanWashPlt').addEventListener('input', ()=> recalcQty('Wash'));
 
 document.getElementById('cleanSubmitBtn').addEventListener('click', async ()=>{
   if(!db){ toast('먼저 Firebase 설정을 완료해주세요.', true); return; }
@@ -1481,21 +1513,26 @@ document.getElementById('cleanSubmitBtn').addEventListener('click', async ()=>{
   const date = document.getElementById('cleanDate').value || todayStr();
   let code = document.getElementById('cleanCode').value.trim();
   let name = document.getElementById('cleanProductName').value.trim();
-  const sepQty = Number(document.getElementById('cleanSepQty').value)||0;
-  const washQty = Number(document.getElementById('cleanWashQty').value)||0;
+  const v = id => Number(document.getElementById(id).value)||0;
+  const sepQty = v('cleanSepQty'), sepPlt = v('cleanSepPlt'), washQty = v('cleanWashQty'), washPlt = v('cleanWashPlt');
   const note = document.getElementById('cleanNote').value.trim();
   if(!code && !name){ toast('제품코드 또는 제품명을 입력해주세요.', true); return; }
   if(code && !name) name = productsMap[code] || '';
   if(name && !code) code = productsByName[name] || '';
-  if(sepQty === 0 && washQty === 0){ toast('분리수량 또는 세척수량을 입력해주세요.', true); return; }
+  if(!sepQty && !sepPlt && !washQty && !washPlt){ toast('수량 또는 파렛트를 입력해주세요.', true); return; }
+  const pp = v('cleanPerPallet');
+  if(((sepPlt && !sepQty) || (washPlt && !washQty)) && !pp){ toast('파렛트로 입력하려면 파렛트당 수량을 먼저 입력해주세요.', true); return; }
   try{
+    if(pp && name && perPalletOf(name) !== pp){
+      await db.collection('config').doc('palletQty').set({ [name]: pp }, { merge: true });
+    }
     const batch = db.batch();
     const ts = firebase.firestore.FieldValue.serverTimestamp();
-    if(sepQty) batch.set(db.collection('cleaningLogs').doc(), { date, productCode: code, productName: name, qty: sepQty, team: 'sep', note, createdAt: ts });
-    if(washQty) batch.set(db.collection('cleaningLogs').doc(), { date, productCode: code, productName: name, qty: washQty, team: 'wash', note, createdAt: ts });
+    if(sepQty || sepPlt) batch.set(db.collection('cleaningLogs').doc(), { date, productCode: code, productName: name, qty: sepQty, pallets: sepPlt, team: 'sep', note, createdAt: ts });
+    if(washQty || washPlt) batch.set(db.collection('cleaningLogs').doc(), { date, productCode: code, productName: name, qty: washQty, pallets: washPlt, team: 'wash', note, createdAt: ts });
     await batch.commit();
     toast('등록 완료');
-    ['cleanCode','cleanProductName','cleanSepQty','cleanWashQty','cleanNote'].forEach(id=> document.getElementById(id).value = '');
+    ['cleanCode','cleanProductName','cleanPerPallet','cleanSepQty','cleanSepPlt','cleanWashQty','cleanWashPlt','cleanNote'].forEach(id=> document.getElementById(id).value = '');
     document.getElementById('cleanNameHint').textContent = '';
     document.getElementById('cleanViewDate').value = date;
     renderCleaning();
@@ -1503,6 +1540,10 @@ document.getElementById('cleanSubmitBtn').addEventListener('click', async ()=>{
 });
 
 function listenCleaning(){
+  db.collection('config').doc('palletQty').onSnapshot(doc=>{
+    palletMap = doc.exists ? doc.data() : {};
+    fillPerPallet();
+  });
   db.collection('cleaningLogs').onSnapshot(snap=>{
     allCleaningLogs = [];
     snap.forEach(doc=> allCleaningLogs.push({ id: doc.id, ...doc.data() }));
@@ -1518,52 +1559,67 @@ function renderCleaning(){
   const byProduct = {};
   allCleaningLogs.filter(l=> l.date === date).forEach(l=>{
     const key = (l.productName || l.productCode || '-');
-    if(!byProduct[key]) byProduct[key] = { name: l.productName || '-', code: l.productCode || '-', sep: 0, wash: 0 };
-    byProduct[key][teamOf(l)] += (l.qty||0);
+    if(!byProduct[key]) byProduct[key] = { name: l.productName || '-', code: l.productCode || '-', sepQ:0, sepP:0, washQ:0, washP:0 };
+    const r = byProduct[key];
+    if(teamOf(l)==='sep'){ r.sepQ += (l.qty||0); r.sepP += (l.pallets||0); }
+    else { r.washQ += (l.qty||0); r.washP += (l.pallets||0); }
   });
-  let sumSep = 0, sumWash = 0;
-  Object.values(byProduct).forEach(r=>{ sumSep += r.sep; sumWash += r.wash; });
-  document.getElementById('cleanSumSep').textContent = sumSep.toLocaleString();
-  document.getElementById('cleanSumWash').textContent = sumWash.toLocaleString();
-  document.getElementById('cleanSumAll').textContent = (sumSep+sumWash).toLocaleString();
+  const T = { sepQ:0, sepP:0, washQ:0, washP:0 };
+  Object.values(byProduct).forEach(r=>{ T.sepQ+=r.sepQ; T.sepP+=r.sepP; T.washQ+=r.washQ; T.washP+=r.washP; });
+  document.getElementById('cleanSumSep').textContent = fmtN(T.sepQ)+'개 / '+fmtN(T.sepP)+'P';
+  document.getElementById('cleanSumWash').textContent = fmtN(T.washQ)+'개 / '+fmtN(T.washP)+'P';
+  document.getElementById('cleanSumAll').textContent = fmtN(T.sepQ+T.washQ)+'개 / '+fmtN(T.sepP+T.washP)+'P';
   const rows = Object.values(byProduct)
     .filter(r=> !q || String(r.code).toLowerCase().includes(q) || String(r.name).toLowerCase().includes(q))
     .sort((a,b)=> String(a.name).localeCompare(String(b.name), 'ko', {numeric:true}));
-  document.getElementById('cleanSummary').textContent = date + ' · ' + rows.length + '개 제품';
+  document.getElementById('cleanSummary').textContent = date + ' · ' + rows.length + '개 제품 (숫자를 누르면 수정 · 파렛트를 고치면 수량도 자동 계산)';
   tbody.innerHTML = '';
   if(rows.length === 0){
-    tbody.innerHTML = '<tr class="empty-row"><td colspan="6">해당 날짜의 분리/세척 내역이 없습니다.</td></tr>';
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="9">해당 날짜의 분리/세척 내역이 없습니다.</td></tr>';
     return;
   }
-  const cell = (r, team, color)=>{
-    const v = r[team];
-    return '<td class="clean-qty" data-name="'+r.name+'" data-code="'+r.code+'" data-team="'+team+'" data-qty="'+v+'" style="cursor:pointer; font-family:var(--font-mono); font-weight:700; color:'+(v?color:'var(--text-dim)')+';" title="클릭하여 수량 수정">'+v+'</td>';
-  };
+  const cell = (r, team, field, v, color)=>
+    '<td class="clean-qty" data-name="'+r.name+'" data-code="'+r.code+'" data-team="'+team+'" data-field="'+field+'" data-v="'+v+'" style="cursor:pointer; font-family:var(--font-mono); font-weight:700; color:'+(v?color:'var(--text-dim)')+';" title="클릭하여 수정">'+fmtN(v)+'</td>';
   rows.forEach(r=>{
     const tr = document.createElement('tr');
-    tr.innerHTML = '<td>'+r.code+'</td><td>'+r.name+'</td>'+cell(r,'sep','var(--amber)')+cell(r,'wash','var(--teal)')+
-      '<td style="font-family:var(--font-mono); font-weight:700;">'+(r.sep+r.wash)+'</td>'+
+    tr.innerHTML = '<td>'+r.code+'</td><td>'+r.name+'</td>'+
+      cell(r,'sep','qty',r.sepQ,'var(--amber)')+cell(r,'sep','pallets',r.sepP,'var(--amber)')+
+      cell(r,'wash','qty',r.washQ,'var(--teal)')+cell(r,'wash','pallets',r.washP,'var(--teal)')+
+      '<td style="font-family:var(--font-mono); font-weight:700;">'+fmtN(r.sepQ+r.washQ)+'</td>'+
+      '<td style="font-family:var(--font-mono); font-weight:700;">'+fmtN(r.sepP+r.washP)+'</td>'+
       '<td><button class="btn-danger" data-name="'+r.name+'">삭제</button></td>';
     tbody.appendChild(tr);
   });
   tbody.querySelectorAll('.clean-qty').forEach(td=>{
     td.addEventListener('click', async ()=>{
       if(!canEditClean()){ toast('관리자 로그인 후 수정할 수 있습니다.', true); return; }
-      const team = td.dataset.team;
-      const input = prompt((team==='sep' ? '분리팀 분리수량' : '세척팀 세척수량')+'을 입력하세요 ('+td.dataset.name+')', td.dataset.qty);
+      const team = td.dataset.team, field = td.dataset.field, name = td.dataset.name;
+      const label = (team==='sep' ? '분리팀 ' : '세척팀 ') + (field==='qty' ? '수량(개)' : '파렛트(P)');
+      const input = prompt(label+'을 입력하세요 ('+name+')', td.dataset.v);
       if(input === null) return;
       const val = Number(input);
       if(isNaN(val) || val < 0){ toast('올바른 숫자를 입력해주세요.', true); return; }
       try{
+        const mine = allCleaningLogs.filter(l=> l.date===date && (l.productName||l.productCode||'-')===name && teamOf(l)===team);
+        const cur = { qty: mine.reduce((a,l)=>a+(l.qty||0),0), pallets: mine.reduce((a,l)=>a+(l.pallets||0),0) };
+        cur[field] = val;
+        if(field === 'pallets'){
+          let pp = perPalletOf(name);
+          if(!pp){
+            const ppIn = prompt('이 제품의 파렛트당 수량(개)을 입력하세요 (수량 자동 계산용, 건너뛰려면 취소)');
+            pp = Number(ppIn)||0;
+            if(pp){ await db.collection('config').doc('palletQty').set({ [name]: pp }, { merge: true }); }
+          }
+          if(pp) cur.qty = Math.round(val*pp*100)/100;
+        }
         const batch = db.batch();
-        allCleaningLogs.filter(l=> l.date===date && (l.productName||l.productCode||'-')===td.dataset.name && teamOf(l)===team)
-          .forEach(l=> batch.delete(db.collection('cleaningLogs').doc(l.id)));
-        if(val > 0) batch.set(db.collection('cleaningLogs').doc(), {
-          date, productCode: td.dataset.code==='-'?'':td.dataset.code, productName: td.dataset.name==='-'?'':td.dataset.name,
-          qty: val, team, note: '', createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        mine.forEach(l=> batch.delete(db.collection('cleaningLogs').doc(l.id)));
+        if(cur.qty > 0 || cur.pallets > 0) batch.set(db.collection('cleaningLogs').doc(), {
+          date, productCode: td.dataset.code==='-'?'':td.dataset.code, productName: name==='-'?'':name,
+          qty: cur.qty, pallets: cur.pallets, team, note: '', createdAt: firebase.firestore.FieldValue.serverTimestamp()
         });
         await batch.commit();
-        toast('수량 수정 완료');
+        toast('수정 완료');
       }catch(e){ toast('수정 실패: ' + e.message, true); }
     });
   });
