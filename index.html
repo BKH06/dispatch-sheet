@@ -100,6 +100,7 @@
   .ship-all-btn.undo{ border-color:var(--text-dim); color:var(--text-dim); }
   body:not(.master-mode):not(.admin-mode) .ship-all-btn{ display:none; }
   body:not(.master-mode) #attAdminPanel{ display:none; }
+  body:not(.master-mode) .att-master{ display:none; }
   .att-edit{ cursor:pointer; }
   body:not(.master-mode) .att-edit{ cursor:default; }
   .att-chip{ display:inline-flex; align-items:center; gap:6px; padding:5px 10px; border:1px solid var(--line); border-radius:999px; margin:4px 6px 0 0; font-size:13px; }
@@ -539,24 +540,35 @@
           <h2>출퇴근 기록</h2>
           <label>작업자</label>
           <select id="attWorkerSelect"></select>
+          <label>본인 번호 (4자리)</label>
+          <input type="password" id="attPin" inputmode="numeric" maxlength="4" placeholder="••••" autocomplete="off" style="text-align:center; letter-spacing:8px; font-size:20px;">
           <div class="hint" id="attTodayStatus" style="margin:10px 0;"></div>
-          <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+          <div id="attPunchBtns" style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
             <button class="btn-primary" id="attInBtn" style="font-size:18px; padding:16px; margin-top:0;">출근</button>
             <button class="btn-primary" id="attOutBtn" style="font-size:18px; padding:16px; margin-top:0; background:var(--teal); color:#0F1417;">퇴근</button>
           </div>
-          <div class="hint" style="margin-top:8px;">버튼을 누른 순간의 현재 시각이 기록돼요.</div>
+          <div id="attNoKiosk" class="hint" style="display:none; padding:10px 12px; border:1px solid var(--amber); border-radius:8px; color:var(--amber);">이 기기에서는 출퇴근을 기록할 수 없어요. 지정된 출퇴근 단말기를 이용해주세요.</div>
+          <button class="btn-ghost" id="attMyBtn" style="width:100%; margin-top:10px;">내 이번 달 기록 보기</button>
+          <div id="attMyRecords" style="margin-top:10px;"></div>
         </div>
         <div class="panel" id="attAdminPanel">
           <h2>작업자 관리</h2>
           <div style="display:flex; gap:8px;">
             <input type="text" id="attNewWorker" placeholder="작업자 이름" style="margin-top:0;">
+            <input type="text" id="attNewPin" inputmode="numeric" maxlength="4" placeholder="번호 4자리" style="margin-top:0; width:110px;">
             <button class="btn-primary" id="attAddWorkerBtn" style="width:auto; margin-top:0; padding:8px 16px;">추가</button>
           </div>
-          <div id="attWorkerList" style="margin-top:10px;"></div>
+          <div class="hint" style="margin-top:8px;">이름을 누르면 번호를 새로 정할 수 있어요 (🔑 설정됨 / ⚠ 미설정).</div>
+          <div id="attWorkerList" style="margin-top:6px;"></div>
+          <div style="border-top:1px solid var(--line); margin-top:14px; padding-top:12px;">
+            <div style="font-weight:700; font-size:13px; margin-bottom:6px;">출퇴근 단말기</div>
+            <div class="hint" id="attKioskStatus" style="margin-bottom:8px;"></div>
+            <button class="btn-ghost" id="attKioskBtn" style="width:100%;"></button>
+          </div>
         </div>
       </div>
       <div style="display:flex; flex-direction:column; gap:20px;">
-        <div class="panel">
+        <div class="panel att-master">
           <h2>날짜별 출퇴근표</h2>
           <div class="filter-bar"><div><label>조회 날짜</label><input type="date" id="attDate"></div></div>
           <div class="hint" style="margin-bottom:10px;" id="attDaySummary"></div>
@@ -567,7 +579,7 @@
             </table>
           </div>
         </div>
-        <div class="panel">
+        <div class="panel att-master">
           <h2>월별 집계</h2>
           <div class="filter-bar">
             <div><label>조회 월</label><input type="month" id="attMonth"></div>
@@ -622,6 +634,7 @@ let db = null;
 let productsMap = {};
 let productsByName = {};
 let attWorkers = [];
+let attPins = {};
 let attData = {};
 const attUnsubs = {};
 let unsubscribeOrders = null;
@@ -1818,6 +1831,22 @@ function workMin(rec){
   return d;
 }
 function fmtDur(m){ return m === null ? '-' : Math.floor(m/60)+'시간 '+String(m%60).padStart(2,'0')+'분'; }
+function pinHash(name, pin){ // 간단한 변환값 저장 (번호 그대로 노출 방지용)
+  let h1 = 0xdeadbeef, h2 = 0x41c6ce57; const str = name+'|'+pin+'|dispatch';
+  for(let i=0;i<str.length;i++){ const c = str.charCodeAt(i); h1 = Math.imul(h1 ^ c, 2654435761); h2 = Math.imul(h2 ^ c, 1597334677); }
+  h1 = Math.imul(h1 ^ (h1>>>16), 2246822507) ^ Math.imul(h2 ^ (h2>>>13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2>>>16), 2246822507) ^ Math.imul(h1 ^ (h1>>>13), 3266489909);
+  return String(4294967296 * (2097151 & h2) + (h1>>>0));
+}
+function isKiosk(){ try{ return localStorage.getItem('attKiosk') === '1'; }catch(e){ return false; } }
+function checkPin(worker){
+  if(!worker){ toast('작업자를 먼저 선택해주세요.', true); return false; }
+  if(!attPins[worker]){ toast('이 작업자는 번호가 아직 설정되지 않았어요. 마스터에게 문의해주세요.', true); return false; }
+  const pin = document.getElementById('attPin').value.trim();
+  if(!/^\d{4}$/.test(pin)){ toast('본인 번호 4자리를 입력해주세요.', true); return false; }
+  if(pinHash(worker, pin) !== attPins[worker]){ toast('번호가 맞지 않아요.', true); return false; }
+  return true;
+}
 function attRec(date, worker){ const m = attData[ymOf(date)] || {}; return (m[date] && m[date][worker]) || {}; }
 function canEditAtt(){ return document.body.classList.contains('master-mode'); }
 
@@ -1831,6 +1860,7 @@ function ensureAttMonth(ym){
 function listenAttendance(){
   db.collection('config').doc('workers').onSnapshot(doc=>{
     attWorkers = (doc.exists && Array.isArray(doc.data().list)) ? doc.data().list : [];
+    attPins = (doc.exists && doc.data().pins) || {};
     renderAttendance();
   });
   ensureAttMonth(ymOf(todayStr()));
@@ -1850,21 +1880,35 @@ function renderAttendance(){
   // 오늘 상태
   const today = todayStr();
   const st = document.getElementById('attTodayStatus');
-  if(sel.value){
+  const kiosk = isKiosk();
+  document.getElementById('attPunchBtns').style.display = kiosk ? 'grid' : 'none';
+  document.getElementById('attNoKiosk').style.display = kiosk ? 'none' : 'block';
+  document.getElementById('attKioskStatus').textContent = kiosk ? '✅ 이 기기는 출퇴근 단말기로 지정되어 있어요.' : '이 기기는 출퇴근 단말기가 아니에요. 출퇴근을 찍을 기기에서 마스터로 로그인해 지정해주세요.';
+  document.getElementById('attKioskBtn').textContent = kiosk ? '이 기기 단말기 지정 해제' : '📲 이 기기를 출퇴근 단말기로 지정';
+  if(sel.value && canEditAtt()){
     const r = attRec(today, sel.value);
     st.textContent = '오늘 ' + (r.in ? '출근 '+r.in : '출근 -') + ' / ' + (r.out ? '퇴근 '+r.out : '퇴근 -') + (workMin(r)!==null ? ' · '+fmtDur(workMin(r)) : '');
   }else{
-    st.textContent = attWorkers.length ? '' : '등록된 작업자가 없습니다. 마스터 로그인 후 "작업자 관리"에서 추가해주세요.';
+    st.textContent = (attWorkers.length || canEditAtt()===false) ? '' : '등록된 작업자가 없습니다. "작업자 관리"에서 추가해주세요.';
   }
 
   // 작업자 관리
   const wl = document.getElementById('attWorkerList');
-  wl.innerHTML = attWorkers.map(w=>'<span class="att-chip">'+esc(w)+'<button data-w="'+esc(w)+'" title="삭제">✕</button></span>').join('') || '<span class="hint">등록된 작업자가 없습니다.</span>';
+  wl.innerHTML = attWorkers.map(w=>'<span class="att-chip"><span class="att-pinset" data-w="'+esc(w)+'" style="cursor:pointer;" title="눌러서 번호 설정/변경">'+esc(w)+' '+(attPins[w]?'🔑':'⚠')+'</span><button data-w="'+esc(w)+'" title="삭제">✕</button></span>').join('') || '<span class="hint">등록된 작업자가 없습니다.</span>';
   wl.querySelectorAll('button').forEach(b=> b.addEventListener('click', async ()=>{
     if(!canEditAtt()) return;
     if(!confirm(b.dataset.w+' 님을 목록에서 삭제할까요? (이미 기록된 출퇴근은 남아요)')) return;
-    try{ await db.collection('config').doc('workers').set({ list: attWorkers.filter(x=> x !== b.dataset.w) }); }
+    try{ await db.collection('config').doc('workers').set({ list: attWorkers.filter(x=> x !== b.dataset.w), pins: { [b.dataset.w]: firebase.firestore.FieldValue.delete() } }, { merge: true }); }
     catch(e){ toast('삭제 실패: ' + e.message, true); }
+  }));
+  wl.querySelectorAll('.att-pinset').forEach(sp=> sp.addEventListener('click', async ()=>{
+    if(!canEditAtt()) return;
+    const w = sp.dataset.w;
+    const input = prompt(w+' 님의 새 번호 4자리를 입력하세요');
+    if(input === null) return;
+    if(!/^\d{4}$/.test(input.trim())){ toast('번호는 숫자 4자리여야 해요.', true); return; }
+    try{ await db.collection('config').doc('workers').set({ pins: { [w]: pinHash(w, input.trim()) } }, { merge: true }); toast(w+' 번호 설정 완료'); }
+    catch(e){ toast('저장 실패: ' + e.message, true); }
   }));
 
   // 날짜별 표
@@ -1928,7 +1972,8 @@ function monthSummary(ym){
 async function attPunch(kind){
   if(!db){ toast('먼저 Firebase 설정을 완료해주세요.', true); return; }
   const worker = document.getElementById('attWorkerSelect').value;
-  if(!worker){ toast('작업자를 먼저 선택해주세요.', true); return; }
+  if(!isKiosk()){ toast('이 기기에서는 출퇴근을 기록할 수 없어요. 지정된 단말기를 이용해주세요.', true); return; }
+  if(!checkPin(worker)) return;
   const today = todayStr();
   ensureAttMonth(ymOf(today));
   const r = attRec(today, worker);
@@ -1941,6 +1986,7 @@ async function attPunch(kind){
   try{
     await attSet(today, worker, kind, t);
     try{ localStorage.setItem('attWorker', worker); }catch(e){}
+    document.getElementById('attPin').value = '';
     toast(worker+' '+(kind==='in'?'출근':'퇴근')+' '+t+' 기록 완료');
   }catch(e){ toast('기록 실패: ' + e.message, true); }
 }
@@ -1948,6 +1994,7 @@ async function attPunch(kind){
 document.getElementById('attInBtn').addEventListener('click', ()=> attPunch('in'));
 document.getElementById('attOutBtn').addEventListener('click', ()=> attPunch('out'));
 document.getElementById('attWorkerSelect').addEventListener('change', ()=>{
+  document.getElementById('attMyRecords').innerHTML = '';
   try{ localStorage.setItem('attWorker', document.getElementById('attWorkerSelect').value); }catch(e){}
   renderAttendance();
 });
@@ -1959,7 +2006,9 @@ document.getElementById('attAddWorkerBtn').addEventListener('click', async ()=>{
   const name = inp.value.trim();
   if(!name) return;
   if(attWorkers.includes(name)){ toast('이미 등록된 이름입니다.', true); return; }
-  try{ await db.collection('config').doc('workers').set({ list: attWorkers.concat([name]) }); inp.value = ''; toast('작업자 추가 완료'); }
+  const pin = document.getElementById('attNewPin').value.trim();
+  if(!/^\d{4}$/.test(pin)){ toast('번호는 숫자 4자리로 입력해주세요.', true); return; }
+  try{ await db.collection('config').doc('workers').set({ list: attWorkers.concat([name]), pins: { [name]: pinHash(name, pin) } }, { merge: true }); inp.value = ''; document.getElementById('attNewPin').value = ''; toast('작업자 추가 완료'); }
   catch(e){ toast('추가 실패: ' + e.message, true); }
 });
 document.getElementById('attExportBtn').addEventListener('click', ()=>{
@@ -1976,6 +2025,34 @@ document.getElementById('attExportBtn').addEventListener('click', ()=>{
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(sum), '월별집계');
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(det), '일별기록');
   XLSX.writeFile(wb, '출퇴근_'+ym+'.xlsx');
+});
+document.getElementById('attKioskBtn').addEventListener('click', ()=>{
+  if(!canEditAtt()){ toast('마스터관리자만 설정할 수 있습니다.', true); return; }
+  try{
+    if(isKiosk()){ localStorage.removeItem('attKiosk'); toast('단말기 지정을 해제했어요.'); }
+    else{ localStorage.setItem('attKiosk', '1'); toast('이 기기를 출퇴근 단말기로 지정했어요.'); }
+  }catch(e){ toast('이 브라우저에서는 설정할 수 없어요.', true); }
+  renderAttendance();
+});
+document.getElementById('attMyBtn').addEventListener('click', ()=>{
+  const worker = document.getElementById('attWorkerSelect').value;
+  const box = document.getElementById('attMyRecords');
+  if(!checkPin(worker)){ box.innerHTML = ''; return; }
+  const ym = ymOf(todayStr());
+  ensureAttMonth(ym);
+  const m = attData[ym] || {};
+  let total = 0, days = 0, rows = '';
+  Object.keys(m).sort().forEach(d=>{
+    const r = (m[d] || {})[worker];
+    if(!r || (!r.in && !r.out)) return;
+    const w = workMin(r);
+    if(r.in) days++;
+    if(w !== null) total += w;
+    rows += '<tr><td>'+d.slice(5)+'</td><td style="font-family:var(--font-mono);">'+(r.in||'-')+'</td><td style="font-family:var(--font-mono);">'+(r.out||'-')+'</td><td style="font-family:var(--font-mono);">'+fmtDur(w)+'</td></tr>';
+  });
+  document.getElementById('attPin').value = '';
+  box.innerHTML = '<div class="hint" style="margin-bottom:6px;">'+esc(worker)+' · '+ym+' · 출근 '+days+'일 · 총 '+fmtDur(total)+'</div>' +
+    (rows ? '<div style="overflow-x:auto; max-height:260px; overflow-y:auto;"><table><thead><tr><th>날짜</th><th>출근</th><th>퇴근</th><th>근무</th></tr></thead><tbody>'+rows+'</tbody></table></div>' : '<div class="hint">이번 달 기록이 없습니다.</div>');
 });
 document.getElementById('attDate').value = todayStr();
 document.getElementById('attMonth').value = ymOf(todayStr());
