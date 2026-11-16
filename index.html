@@ -99,6 +99,11 @@
   .ship-all-btn:hover{ background:var(--teal); color:#0F1417; }
   .ship-all-btn.undo{ border-color:var(--text-dim); color:var(--text-dim); }
   body:not(.master-mode):not(.admin-mode) .ship-all-btn{ display:none; }
+  body:not(.master-mode) #attAdminPanel{ display:none; }
+  .att-edit{ cursor:pointer; }
+  body:not(.master-mode) .att-edit{ cursor:default; }
+  .att-chip{ display:inline-flex; align-items:center; gap:6px; padding:5px 10px; border:1px solid var(--line); border-radius:999px; margin:4px 6px 0 0; font-size:13px; }
+  .att-chip button{ background:none; border:none; color:var(--red); cursor:pointer; font-size:14px; padding:0; }
   .clean-tab.active{ background:var(--panel-2); border-color:var(--text); font-weight:700; }
   body:not(.master-mode) .grid{ grid-template-columns: 1fr; }
   body:not(.master-mode) .btn-danger{ display:none; }
@@ -263,6 +268,7 @@
     <div class="home-buttons">
       <button class="home-btn" id="goShipmentBtn">출고현황</button>
       <button class="home-btn" id="goCleaningBtn">세척현황</button>
+      <button class="home-btn" id="goAttendanceBtn">출퇴근</button>
     </div>
   </div>
 
@@ -525,6 +531,59 @@
     </div>
   </div>
 
+  <div id="attendanceView" style="display:none;">
+    <button class="btn-ghost" id="backHomeFromAttendance" style="margin-bottom:16px;">← 홈</button>
+    <div class="grid">
+      <div style="display:flex; flex-direction:column; gap:20px;">
+        <div class="panel">
+          <h2>출퇴근 기록</h2>
+          <label>작업자</label>
+          <select id="attWorkerSelect"></select>
+          <div class="hint" id="attTodayStatus" style="margin:10px 0;"></div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+            <button class="btn-primary" id="attInBtn" style="font-size:18px; padding:16px; margin-top:0;">출근</button>
+            <button class="btn-primary" id="attOutBtn" style="font-size:18px; padding:16px; margin-top:0; background:var(--teal); color:#0F1417;">퇴근</button>
+          </div>
+          <div class="hint" style="margin-top:8px;">버튼을 누른 순간의 현재 시각이 기록돼요.</div>
+        </div>
+        <div class="panel" id="attAdminPanel">
+          <h2>작업자 관리</h2>
+          <div style="display:flex; gap:8px;">
+            <input type="text" id="attNewWorker" placeholder="작업자 이름" style="margin-top:0;">
+            <button class="btn-primary" id="attAddWorkerBtn" style="width:auto; margin-top:0; padding:8px 16px;">추가</button>
+          </div>
+          <div id="attWorkerList" style="margin-top:10px;"></div>
+        </div>
+      </div>
+      <div style="display:flex; flex-direction:column; gap:20px;">
+        <div class="panel">
+          <h2>날짜별 출퇴근표</h2>
+          <div class="filter-bar"><div><label>조회 날짜</label><input type="date" id="attDate"></div></div>
+          <div class="hint" style="margin-bottom:10px;" id="attDaySummary"></div>
+          <div style="overflow-x:auto;">
+            <table>
+              <thead><tr><th>작업자</th><th>출근</th><th>퇴근</th><th>근무시간</th></tr></thead>
+              <tbody id="attDayRows"><tr class="empty-row"><td colspan="4">불러오는 중...</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="panel">
+          <h2>월별 집계</h2>
+          <div class="filter-bar">
+            <div><label>조회 월</label><input type="month" id="attMonth"></div>
+            <div><label>&nbsp;</label><button class="btn-ghost" id="attExportBtn" style="margin-top:0;">📥 엑셀로 내보내기</button></div>
+          </div>
+          <div style="overflow-x:auto;">
+            <table>
+              <thead><tr><th>작업자</th><th>출근일수</th><th>총 근무시간</th><th>퇴근 미기록</th></tr></thead>
+              <tbody id="attMonthRows"><tr class="empty-row"><td colspan="4">불러오는 중...</td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
 </div>
 
 <div class="toast" id="toast"></div>
@@ -562,6 +621,9 @@ const PRICE_MAP = {"001":{"group":"A","price":83.54,"category":"BOX"},"008":{"gr
 let db = null;
 let productsMap = {};
 let productsByName = {};
+let attWorkers = [];
+let attData = {};
+const attUnsubs = {};
 let unsubscribeOrders = null;
 let currentOrders = [];
 
@@ -594,6 +656,7 @@ function initFirebase(){
     checkProductsSeeded();
     listenOrders();
     listenCleaning();
+    listenAttendance();
     listenLocationOrder();
     if(document.body.classList.contains('master-mode')) listenAllOrdersForReport();
   }catch(e){
@@ -1742,13 +1805,191 @@ document.querySelectorAll('.clean-tab').forEach(b=> b.addEventListener('click', 
 document.getElementById('cleanViewDate').addEventListener('change', renderCleaning);
 document.getElementById('cleanSearchInput').addEventListener('input', renderCleaning);
 
+// ===== 출퇴근 =====
+// 데이터: config/workers {list:[이름...]}, config/attendance_YYYY-MM {날짜:{이름:{in,out}}}
+function esc(t){ return String(t).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;'); }
+function ymOf(d){ return d.slice(0,7); }
+function nowHM(){ const d = new Date(); return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); }
+function toMin(hm){ const p = String(hm).split(':'); return (Number(p[0])||0)*60 + (Number(p[1])||0); }
+function workMin(rec){
+  if(!rec || !rec.in || !rec.out) return null;
+  let d = toMin(rec.out) - toMin(rec.in);
+  if(d < 0) d += 1440; // 자정을 넘긴 근무
+  return d;
+}
+function fmtDur(m){ return m === null ? '-' : Math.floor(m/60)+'시간 '+String(m%60).padStart(2,'0')+'분'; }
+function attRec(date, worker){ const m = attData[ymOf(date)] || {}; return (m[date] && m[date][worker]) || {}; }
+function canEditAtt(){ return document.body.classList.contains('master-mode'); }
+
+function ensureAttMonth(ym){
+  if(!db || !ym || attUnsubs[ym]) return;
+  attUnsubs[ym] = db.collection('config').doc('attendance_'+ym).onSnapshot(doc=>{
+    attData[ym] = doc.exists ? doc.data() : {};
+    renderAttendance();
+  });
+}
+function listenAttendance(){
+  db.collection('config').doc('workers').onSnapshot(doc=>{
+    attWorkers = (doc.exists && Array.isArray(doc.data().list)) ? doc.data().list : [];
+    renderAttendance();
+  });
+  ensureAttMonth(ymOf(todayStr()));
+}
+async function attSet(date, worker, field, val){
+  const f = val ? val : firebase.firestore.FieldValue.delete();
+  await db.collection('config').doc('attendance_'+ymOf(date)).set({ [date]: { [worker]: { [field]: f } } }, { merge: true });
+}
+
+function renderAttendance(){
+  const sel = document.getElementById('attWorkerSelect');
+  if(!sel) return;
+  const prev = sel.value || (function(){ try{ return localStorage.getItem('attWorker') || ''; }catch(e){ return ''; } })();
+  sel.innerHTML = '<option value="">작업자를 선택하세요</option>' + attWorkers.map(w=>'<option value="'+esc(w)+'">'+esc(w)+'</option>').join('');
+  if(attWorkers.includes(prev)) sel.value = prev;
+
+  // 오늘 상태
+  const today = todayStr();
+  const st = document.getElementById('attTodayStatus');
+  if(sel.value){
+    const r = attRec(today, sel.value);
+    st.textContent = '오늘 ' + (r.in ? '출근 '+r.in : '출근 -') + ' / ' + (r.out ? '퇴근 '+r.out : '퇴근 -') + (workMin(r)!==null ? ' · '+fmtDur(workMin(r)) : '');
+  }else{
+    st.textContent = attWorkers.length ? '' : '등록된 작업자가 없습니다. 마스터 로그인 후 "작업자 관리"에서 추가해주세요.';
+  }
+
+  // 작업자 관리
+  const wl = document.getElementById('attWorkerList');
+  wl.innerHTML = attWorkers.map(w=>'<span class="att-chip">'+esc(w)+'<button data-w="'+esc(w)+'" title="삭제">✕</button></span>').join('') || '<span class="hint">등록된 작업자가 없습니다.</span>';
+  wl.querySelectorAll('button').forEach(b=> b.addEventListener('click', async ()=>{
+    if(!canEditAtt()) return;
+    if(!confirm(b.dataset.w+' 님을 목록에서 삭제할까요? (이미 기록된 출퇴근은 남아요)')) return;
+    try{ await db.collection('config').doc('workers').set({ list: attWorkers.filter(x=> x !== b.dataset.w) }); }
+    catch(e){ toast('삭제 실패: ' + e.message, true); }
+  }));
+
+  // 날짜별 표
+  const date = document.getElementById('attDate').value || today;
+  ensureAttMonth(ymOf(date));
+  const dayMap = ((attData[ymOf(date)] || {})[date]) || {};
+  const names = attWorkers.concat(Object.keys(dayMap).filter(n=> !attWorkers.includes(n)));
+  const tb = document.getElementById('attDayRows');
+  tb.innerHTML = '';
+  let inCnt = 0;
+  names.forEach(n=>{
+    const r = dayMap[n] || {};
+    if(r.in) inCnt++;
+    const tr = document.createElement('tr');
+    const cell = (f,v)=>'<td class="att-edit" data-w="'+esc(n)+'" data-f="'+f+'" style="font-family:var(--font-mono); font-weight:700; color:'+(v?'var(--teal)':'var(--text-dim)')+';" title="'+(canEditAtt()?'눌러서 시각 수정':'')+'">'+(v||'-')+'</td>';
+    tr.innerHTML = '<td>'+esc(n)+'</td>'+cell('in',r.in)+cell('out',r.out)+'<td style="font-family:var(--font-mono);">'+fmtDur(workMin(r))+'</td>';
+    tb.appendChild(tr);
+  });
+  if(!names.length) tb.innerHTML = '<tr class="empty-row"><td colspan="4">등록된 작업자가 없습니다.</td></tr>';
+  document.getElementById('attDaySummary').textContent = date + ' · 출근 ' + inCnt + '명 / 전체 ' + names.length + '명' + (canEditAtt() ? ' (마스터: 시각을 누르면 수정/입력)' : '');
+  tb.querySelectorAll('.att-edit').forEach(td=> td.addEventListener('click', async ()=>{
+    if(!canEditAtt()) return;
+    const w = td.dataset.w, f = td.dataset.f;
+    const cur = attRec(date, w)[f] || '';
+    const input = prompt(w+' '+(f==='in'?'출근':'퇴근')+' 시각 (예: 08:30). 지우려면 비워두세요.', cur);
+    if(input === null) return;
+    const v = input.trim();
+    if(v && !/^([01]?\d|2[0-3]):[0-5]\d$/.test(v)){ toast('시각은 08:30 형식으로 입력해주세요.', true); return; }
+    try{ await attSet(date, w, f, v ? v.padStart(5,'0') : null); toast('저장 완료'); }
+    catch(e){ toast('저장 실패: ' + e.message, true); }
+  }));
+
+  // 월별 집계
+  const ym = document.getElementById('attMonth').value || ymOf(today);
+  ensureAttMonth(ym);
+  const rows = monthSummary(ym);
+  const mb = document.getElementById('attMonthRows');
+  mb.innerHTML = '';
+  if(!rows.length) mb.innerHTML = '<tr class="empty-row"><td colspan="4">기록이 없습니다.</td></tr>';
+  rows.forEach(r=>{
+    const tr = document.createElement('tr');
+    tr.innerHTML = '<td>'+esc(r.name)+'</td><td style="font-family:var(--font-mono);">'+r.days+'일</td><td style="font-family:var(--font-mono); font-weight:700;">'+fmtDur(r.min)+'</td><td style="color:'+(r.missing?'var(--red)':'var(--text-dim)')+';">'+(r.missing||'-')+'</td>';
+    mb.appendChild(tr);
+  });
+}
+
+function monthSummary(ym){
+  const m = attData[ym] || {};
+  const agg = {};
+  attWorkers.forEach(n=> agg[n] = { name:n, days:0, min:0, missing:0 });
+  Object.keys(m).sort().forEach(d=>{
+    Object.keys(m[d] || {}).forEach(n=>{
+      const r = m[d][n];
+      if(!agg[n]) agg[n] = { name:n, days:0, min:0, missing:0 };
+      if(r.in){ agg[n].days++; const w = workMin(r); if(w === null) agg[n].missing++; else agg[n].min += w; }
+    });
+  });
+  return Object.values(agg);
+}
+
+async function attPunch(kind){
+  if(!db){ toast('먼저 Firebase 설정을 완료해주세요.', true); return; }
+  const worker = document.getElementById('attWorkerSelect').value;
+  if(!worker){ toast('작업자를 먼저 선택해주세요.', true); return; }
+  const today = todayStr();
+  ensureAttMonth(ymOf(today));
+  const r = attRec(today, worker);
+  if(kind === 'in' && r.in && !confirm('이미 오늘 출근('+r.in+') 기록이 있어요. 다시 기록할까요?')) return;
+  if(kind === 'out'){
+    if(!r.in && !confirm('오늘 출근 기록이 없어요. 퇴근만 기록할까요?')) return;
+    if(r.out && !confirm('이미 오늘 퇴근('+r.out+') 기록이 있어요. 다시 기록할까요?')) return;
+  }
+  const t = nowHM();
+  try{
+    await attSet(today, worker, kind, t);
+    try{ localStorage.setItem('attWorker', worker); }catch(e){}
+    toast(worker+' '+(kind==='in'?'출근':'퇴근')+' '+t+' 기록 완료');
+  }catch(e){ toast('기록 실패: ' + e.message, true); }
+}
+
+document.getElementById('attInBtn').addEventListener('click', ()=> attPunch('in'));
+document.getElementById('attOutBtn').addEventListener('click', ()=> attPunch('out'));
+document.getElementById('attWorkerSelect').addEventListener('change', ()=>{
+  try{ localStorage.setItem('attWorker', document.getElementById('attWorkerSelect').value); }catch(e){}
+  renderAttendance();
+});
+document.getElementById('attDate').addEventListener('change', renderAttendance);
+document.getElementById('attMonth').addEventListener('change', renderAttendance);
+document.getElementById('attAddWorkerBtn').addEventListener('click', async ()=>{
+  if(!canEditAtt()){ toast('마스터관리자만 추가할 수 있습니다.', true); return; }
+  const inp = document.getElementById('attNewWorker');
+  const name = inp.value.trim();
+  if(!name) return;
+  if(attWorkers.includes(name)){ toast('이미 등록된 이름입니다.', true); return; }
+  try{ await db.collection('config').doc('workers').set({ list: attWorkers.concat([name]) }); inp.value = ''; toast('작업자 추가 완료'); }
+  catch(e){ toast('추가 실패: ' + e.message, true); }
+});
+document.getElementById('attExportBtn').addEventListener('click', ()=>{
+  const ym = document.getElementById('attMonth').value || ymOf(todayStr());
+  const sum = [['작업자','출근일수','총 근무시간(시간)','퇴근 미기록(건)']];
+  monthSummary(ym).forEach(r=> sum.push([r.name, r.days, Math.round(r.min/60*100)/100, r.missing]));
+  const det = [['날짜','작업자','출근','퇴근','근무시간(시간)']];
+  const m = attData[ym] || {};
+  Object.keys(m).sort().forEach(d=> Object.keys(m[d]||{}).forEach(n=>{
+    const r = m[d][n], w = workMin(r);
+    det.push([d, n, r.in||'', r.out||'', w===null ? '' : Math.round(w/60*100)/100]);
+  }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(sum), '월별집계');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(det), '일별기록');
+  XLSX.writeFile(wb, '출퇴근_'+ym+'.xlsx');
+});
+document.getElementById('attDate').value = todayStr();
+document.getElementById('attMonth').value = ymOf(todayStr());
+
 function showView(name){
   document.getElementById('homeView').style.display = name === 'home' ? 'flex' : 'none';
   document.getElementById('shipmentView').style.display = name === 'shipment' ? 'block' : 'none';
   document.getElementById('cleaningView').style.display = name === 'cleaning' ? 'block' : 'none';
+  document.getElementById('attendanceView').style.display = name === 'attendance' ? 'block' : 'none';
 }
 document.getElementById('goShipmentBtn').addEventListener('click', ()=> showView('shipment'));
 document.getElementById('goCleaningBtn').addEventListener('click', ()=> showView('cleaning'));
+document.getElementById('goAttendanceBtn').addEventListener('click', ()=> showView('attendance'));
+document.getElementById('backHomeFromAttendance').addEventListener('click', ()=> showView('home'));
 document.getElementById('backHomeFromShipment').addEventListener('click', ()=> showView('home'));
 document.getElementById('backHomeFromCleaning').addEventListener('click', ()=> showView('home'));
 showView('home');
