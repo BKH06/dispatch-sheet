@@ -94,6 +94,10 @@
   body:not(.master-mode):not(.admin-mode) #cleanFormPanel{ display:none; }
   body:not(.master-mode):not(.admin-mode) #cleanAddBtn{ display:none; }
   body:not(.master-mode):not(.admin-mode) .clean-plus{ display:none; }
+  .ship-all-btn{ padding:5px 10px; border-radius:8px; border:1px solid var(--teal); background:rgba(0,0,0,0); color:var(--teal); font-weight:700; font-size:12.5px; cursor:pointer; white-space:nowrap; }
+  .ship-all-btn:hover{ background:var(--teal); color:#0F1417; }
+  .ship-all-btn.undo{ border-color:var(--text-dim); color:var(--text-dim); }
+  body:not(.master-mode):not(.admin-mode) .ship-all-btn{ display:none; }
   .clean-tab.active{ background:var(--panel-2); border-color:var(--text); font-weight:700; }
   body:not(.master-mode) .grid{ grid-template-columns: 1fr; }
   body:not(.master-mode) .btn-danger{ display:none; }
@@ -1204,6 +1208,16 @@ function shippedQty(o, n){
   const raw = o['v'+n+'Shipped'];
   return (raw !== undefined) ? raw : (o['v'+n+'Done'] ? target : 0);
 }
+function orderAllDone(o){
+  const ns = [1,2,3,4,5].filter(n=> (o['v'+n]||0) > 0);
+  return ns.length > 0 && ns.every(n=> shippedQty(o,n) >= (o['v'+n]||0));
+}
+function shipAllBtn(o){
+  if(![1,2,3,4,5].some(n=> (o['v'+n]||0) > 0)) return '';
+  const done = orderAllDone(o);
+  return '<button class="ship-all-btn'+(done?' undo':'')+'" data-id="'+o.id+'" data-done="'+(done?1:0)+'" title="'+(done?'눌러서 출고완료 취소':'한 번에 전체 출고완료')+'">'+(done?'↩ 완료취소':'✓ 출고완료')+'</button> ';
+}
+
 function vqtyCell(o, n){
   const target = o['v'+n] || 0;
   if(!target) return '<span class="vqty empty">-</span>';
@@ -1284,10 +1298,25 @@ function renderOrders(){
         '<td'+midAttr+'>'+vqtyCell(o,1)+'</td><td'+midAttr+'>'+vqtyCell(o,2)+'</td><td'+midAttr+'>'+vqtyCell(o,3)+'</td><td'+midAttr+'>'+vqtyCell(o,4)+'</td><td'+midAttr+'>'+vqtyCell(o,5)+'</td>'+
         '<td'+midAttr+'>'+o.qty+'</td>'+
         '<td style="font-family:var(--font-body);'+mid+'">'+(o.note||'-')+'</td>'+
-        '<td'+lastAttr+'><button class="btn-danger" data-id="'+o.id+'">삭제</button></td>';
+        '<td'+lastAttr+'>'+shipAllBtn(o)+'<button class="btn-danger" data-id="'+o.id+'">삭제</button></td>';
       tbody.appendChild(tr);
     });
   }
+  tbody.querySelectorAll('.ship-all-btn').forEach(btn=>{
+    btn.addEventListener('click', async (ev)=>{
+      ev.stopPropagation();
+      if(!document.body.classList.contains('admin-mode') && !document.body.classList.contains('master-mode')){ toast('관리자 로그인 후 사용할 수 있습니다.', true); return; }
+      const o = currentOrders.find(x=> x.id === btn.dataset.id);
+      if(!o) return;
+      const undo = btn.dataset.done === '1';
+      const upd = {};
+      [1,2,3,4,5].forEach(n=>{ const t = o['v'+n]||0; if(t > 0) upd['v'+n+'Shipped'] = undo ? 0 : t; });
+      try{
+        await db.collection('orders').doc(o.id).update(upd);
+        toast(undo ? '출고완료를 취소했습니다.' : (o.productName||'')+' 출고완료');
+      }catch(e){ toast('처리 실패: ' + e.message, true); }
+    });
+  });
   tbody.querySelectorAll('.vqty.pending, .vqty.partial, .vqty.done').forEach(el=>{
     el.addEventListener('click', async ()=>{
       if(!document.body.classList.contains('admin-mode')){ toast('관리자 로그인 후 입력할 수 있습니다.', true); return; }
